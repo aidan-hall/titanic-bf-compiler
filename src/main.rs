@@ -163,10 +163,18 @@ fn optimise(ast: Ast) -> Ast {
                     optimised_ast.push(acc);
                     acc = ACC_DEFAULT_VALUE;
                 }
-                Some(Loop(optimise(loop_contents)))
-            }
+                let res = Loop(optimise(loop_contents));
+		acc = ACC_DEFAULT_VALUE;
+		Some(res)
+            },
             // Wild card for all other symbol types.
-            a => Some(a),
+            a => {
+                if is_useful(&acc) {
+                    optimised_ast.push(acc);
+                    acc = ACC_DEFAULT_VALUE;
+                }
+		Some(a)
+	    },
         } {
             optimised_ast.push(optimised_symbol);
         }
@@ -260,19 +268,16 @@ mod tests {
 
     #[test]
     fn nested_brackets() {
-	let source = "[[++]]";
-	let symbols = parsed(&lexed(source)).expect("Valid source.");
+        let source = "[[++]]";
+        let symbols = parsed(&lexed(source)).expect("Valid source.");
 
-	use Symbol::*;
-	let expected_symbols = vec![
-	    Loop(vec![Loop(vec![Add(1), Add(1)])]),
-	];
+        use Symbol::*;
+        let expected_symbols = vec![Loop(vec![Loop(vec![Add(1), Add(1)])])];
 
         assert_eq!(symbols.len(), expected_symbols.len());
         for (exp, act) in std::iter::zip(&expected_symbols, &symbols) {
             assert_eq!(exp, act);
         }
-
     }
 
     #[test]
@@ -291,13 +296,144 @@ mod tests {
 
 /// Compile the AST to NASM x86 assembly.
 fn compiled_x86(ast: &Ast) -> String {
-    let mut asm = String::new();
+    let mut asm = String::from(
+        "SYS_EXIT:	equ	1
+SYS_READ:	equ	3
+SYS_WRITE:	equ	4
+STDIN:		equ	0
+STDOUT: 	equ	1
 
-    // TODO: Symbols... ASSEMBLE!!!
+	; Parameters: left bracket identifier, right bracket identifier
+%macro left_bracket 2
+%1:
+	cmp ecx, 0
+	jz %2
+%endmacro
+
+	; Parameters: left bracket identifier, right bracket identifier
+%macro right_bracket 2
+	jmp %1
+%2:
+%endmacro
+
+%macro macro_shift 1
+	mov ebx, %1
+	call memory_shift
+%endmacro
+
+section .text
+	global _start
+
+_start:
+	;; Zero ecx & eax
+	xor ecx, ecx
+	xor eax, eax
+",
+    );
+
+    let (mapped, _) = mapped_x86(ast, 0);
+
+    asm.push_str(mapped.as_str());
+
+    asm.push_str(
+        "
+	; Exit with status 0 (success).
+	mov eax, SYS_EXIT
+	mov ebx, 0
+	int 80h
+
+write_value:
+	mov [cells+eax], ecx
+	push eax
+	push ecx
+
+	mov ecx, cells
+	add ecx, eax
+	mov eax, SYS_WRITE
+	mov ebx, STDOUT
+	mov edx, 1
+	int 80h
+
+	pop ecx
+	pop eax
+	ret
+
+
+memory_shift:			; Uses ebx as value to shift by.
+	mov [cells+eax], ecx
+	add eax, ebx
+	mov ecx, [cells+eax]
+	ret
+
+section .bss
+cells:	times 30000 db 0
+",
+    );
 
     asm
 }
 
+/// Maps the AST to a String, tracking number of labelled loops to avoid conflict.
+fn mapped_x86(ast: &Ast, loop_counter: usize) -> (String, usize) {
+    // Actually a local copy.
+    let mut loop_counter = loop_counter;
+
+    let mut asm = String::new();
+
+    for symbol in ast {
+        use Symbol::*;
+        let instruction = match symbol {
+            Add(n) => format!("\tadd ecx, {n}\n"),
+            Shift(n) => format!("\tmacro_shift {n}\n"),
+            Input => todo!(),
+            Output => format!("\tcall write_value\n"),
+            Loop(loop_contents) => {
+                let loop_num = loop_counter;
+                let (res, updated_loop_counter) = mapped_x86(loop_contents, loop_counter + 1);
+                loop_counter = updated_loop_counter;
+                format!(
+                    "\tleft_bracket lb{loop_num}, rb{loop_num}
+{res}
+\tright_bracket lb{loop_num}, rb{loop_num}
+"
+                )
+            }
+        };
+        asm.push_str(instruction.as_str());
+    }
+
+    (asm, loop_counter)
+}
+
 fn main() {
-    println!("Hello, world!");
+    use std::env;
+    use std::fs;
+
+    let args: Vec<String> = env::args().collect();
+
+    for arg in &args.as_slice()[1..] {
+        let name = format!("{arg}-compiled.asm");
+	let src = fs::read_to_string(arg)
+	    .expect("Couldn't read {arg}.");
+
+	match parsed(&lexed(src.as_str())) {
+	    Err(e) => eprintln!("Couldn't compile {arg}: {e:?}"),
+	    Ok(ast) => {
+		let asm = compiled_x86(&ast);
+		fs::write(&name, asm).expect("Couldn't write to {name}.");
+		eprintln!("Assembly written to {name}");
+	    }
+	}
+    }
+
+//     let src = compiled_x86(
+//         &parsed(&lexed(
+//             "
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++>+++[-<+>]<.
+// Output new line character to flush stdout
+// >>++++++++++.",
+//         ))
+//         .expect("Valid"),
+//     );
+//     println!("{src}");
 }
