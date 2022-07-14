@@ -272,6 +272,15 @@ mod tests {
     }
 }
 
+/// Compile the AST to NASM x86 assembly.
+fn compiled_x86(ast: &Ast) -> String {
+    let mut asm = String::new();
+
+    // TODO: Symbols... ASSEMBLE!!!
+
+    asm
+}
+
 fn main() {
     println!("Hello, world!");
 }
