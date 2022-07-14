@@ -344,6 +344,18 @@ _start:
 	mov ebx, 0
 	int 80h
 
+read_value:
+	push eax
+	mov ecx, cells
+	add ecx, eax
+	mov eax, SYS_READ
+	mov ebx, 2
+	mov edx, 1
+	int 80h
+	pop eax
+	mov ecx, [cells+eax]
+	ret
+
 write_value:
 	mov [cells+eax], ecx
 	push eax
@@ -387,8 +399,8 @@ fn mapped_x86(ast: &Ast, loop_counter: usize) -> (String, usize) {
         let instruction = match symbol {
             Add(n) => format!("\tadd ecx, {n}\n"),
             Shift(n) => format!("\tmacro_shift {n}\n"),
-            Input => todo!(),
-            Output => format!("\tcall write_value\n"),
+            Input => "\tcall read_value\n".to_string(),
+            Output => "\tcall write_value\n".to_string(),
             Loop(loop_contents) => {
                 let loop_num = loop_counter;
                 let (res, updated_loop_counter) = mapped_x86(loop_contents, loop_counter + 1);
