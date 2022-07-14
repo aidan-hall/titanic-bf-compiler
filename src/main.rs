@@ -16,21 +16,21 @@ fn lex(source: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
 
     for c in source.chars() {
-	use Token::*;
-	if let Some(t) = match c {
-	    '+' => Some(Inc),
-	    '-' => Some(Dec),
-	    '<' => Some(ShiftLeft),
-	    '>' => Some(ShiftRight),
-	    '[' => Some(BracketLeft),
-	    ']' => Some(BracketRight),
-	    ',' => Some(Input),
-	    '.' => Some(Output),
-	    // Simply ignore non-BF characters.
-	    _ => None,
-	} {
-	    tokens.push(t);
-	}
+        use Token::*;
+        if let Some(t) = match c {
+            '+' => Some(Inc),
+            '-' => Some(Dec),
+            '<' => Some(ShiftLeft),
+            '>' => Some(ShiftRight),
+            '[' => Some(BracketLeft),
+            ']' => Some(BracketRight),
+            ',' => Some(Input),
+            '.' => Some(Output),
+            // Simply ignore non-BF characters.
+            _ => None,
+        } {
+            tokens.push(t);
+        }
     }
 
     tokens
