@@ -47,9 +47,31 @@ enum Symbol {
     Loop(Vec<Symbol>),
 }
 
-/// Parse the token stream into an AST, with (trivial) optimisations.
-fn parse(tokens: Vec<Token>) -> Vec<Symbol> {
-    Vec::new()
+enum ParseError {
+    ImbalancedBrackets,
+}
+
+type Ast = Vec<Symbol>;
+
+/// Parse the token stream into an AST. Perform no optimisations.
+fn parse(tokens: Vec<Token>) -> Result<Ast, ParseError> {
+    use std::collections::LinkedList;
+
+    let mut asts: LinkedList<Ast> = LinkedList::new();
+    asts.push_front(Vec::new());
+
+    // TODO: Consoom tokens.
+
+    match asts.len() {
+        1 => {
+            // Take ownership: Ha ha, I understand Rust!
+            let ast = asts
+                .pop_front()
+                .expect("len = 1, so there should be a front element.");
+            Ok(ast)
+        }
+        _ => Err(ParseError::ImbalancedBrackets),
+    }
 }
 
 #[cfg(test)]
