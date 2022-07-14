@@ -11,6 +11,7 @@ enum Token {
     Output,
 }
 
+/// Lex the source into a token stream, ignoring non-BF characters.
 fn lex(source: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
 
@@ -33,6 +34,22 @@ fn lex(source: &str) -> Vec<Token> {
     }
 
     tokens
+}
+
+enum Symbol {
+    // Subtraction is negative addition.
+    Add(i32),
+    // A positive value means a right shift. Left shift is a negative right shift.
+    Shift(i32),
+    Input,
+    Output,
+    // This is what makes it an abstract syntax *tree*!
+    Loop(Vec<Symbol>),
+}
+
+/// Parse the token stream into an AST, with (trivial) optimisations.
+fn parse(tokens: Vec<Token>) -> Vec<Symbol> {
+    Vec::new()
 }
 
 #[cfg(test)]
