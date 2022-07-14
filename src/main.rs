@@ -259,6 +259,23 @@ mod tests {
     }
 
     #[test]
+    fn nested_brackets() {
+	let source = "[[++]]";
+	let symbols = parsed(&lexed(source)).expect("Valid source.");
+
+	use Symbol::*;
+	let expected_symbols = vec![
+	    Loop(vec![Loop(vec![Add(1), Add(1)])]),
+	];
+
+        assert_eq!(symbols.len(), expected_symbols.len());
+        for (exp, act) in std::iter::zip(&expected_symbols, &symbols) {
+            assert_eq!(exp, act);
+        }
+
+    }
+
+    #[test]
     fn optimisation() {
         let source = "+++->>><<";
         let ast = optimise(parsed(&lexed(source)).expect("Valid source."));
