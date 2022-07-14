@@ -143,6 +143,7 @@ fn optimise(ast: Ast) -> Ast {
                     acc = Add(n);
                     Some(res)
                 } else {
+		    acc = Add(n);
                     None
                 }
             }
@@ -155,6 +156,7 @@ fn optimise(ast: Ast) -> Ast {
                     acc = Shift(n);
                     Some(res)
                 } else {
+		    acc = Shift(n);
                     None
                 }
             }
@@ -282,10 +284,10 @@ mod tests {
 
     #[test]
     fn optimisation() {
-        let source = "+++->>><<";
+        let source = "+++->>><<[><<]>";
         let ast = optimise(parsed(&lexed(source)).expect("Valid source."));
         use Symbol::*;
-        let expected_ast = vec![Add(2), Shift(1)];
+        let expected_ast = vec![Add(2), Shift(1), Loop(vec![Shift(-1)]), Shift(1)];
 
         assert_eq!(ast.len(), expected_ast.len());
         for (exp, act) in std::iter::zip(&expected_ast, &ast) {
@@ -419,7 +421,7 @@ fn main() {
 	match parsed(&lexed(src.as_str())) {
 	    Err(e) => eprintln!("Couldn't compile {arg}: {e:?}"),
 	    Ok(ast) => {
-		let asm = compiled_x86(&ast);
+		let asm = compiled_x86(&optimise(ast));
 		fs::write(&name, asm).expect("Couldn't write to {name}.");
 		eprintln!("Assembly written to {name}");
 	    }
