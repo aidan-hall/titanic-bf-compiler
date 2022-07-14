@@ -46,7 +46,7 @@ enum Symbol {
     Input,
     Output,
     // This is what makes it an abstract syntax *tree*!
-    Loop(Vec<Symbol>),
+    Loop(Ast),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -58,6 +58,8 @@ enum ParseError {
 type Ast = Vec<Symbol>;
 
 /// Parse the token stream into an AST. Perform no optimisations.
+/// Since this is the only function that generates an Ast from something else,
+/// we can assume all Asts are valid (hence the value of the type alias).
 fn parsed(tokens: &Vec<Token>) -> Result<Ast, ParseError> {
     use std::collections::LinkedList;
 
@@ -104,16 +106,93 @@ fn parsed(tokens: &Vec<Token>) -> Result<Ast, ParseError> {
     }
 }
 
+/// Discard sequences which do nothing.
+fn is_useful(symbol: &Symbol) -> bool {
+    symbol != &Symbol::Add(0) && symbol != &Symbol::Shift(0)
+}
+
+/// "Flatten" multiple sequential Add & Shift instructions, recursively.
+/// This function's name is a verb since it takes ownership of/consumes the input.
+fn optimise(ast: Ast) -> Ast {
+    println!("Optimising AST: {ast:?}");
+
+    // Just saves reallocating a new vector.
+    if ast.is_empty() {
+        return ast;
+    }
+
+    use Symbol::*;
+
+    // The initial value will automatically be discarded if the next symbol isn't an Add(),
+    // since it can have no effect.
+    const ACC_DEFAULT_VALUE: Symbol = Add(0);
+
+    // This variable accumulates the effect of multiple of the same Symbol.
+    let mut acc = ACC_DEFAULT_VALUE;
+
+    let mut optimised_ast: Ast = Vec::new();
+
+    for symbol in ast {
+        if let Some(optimised_symbol) = match symbol {
+            Add(n) => {
+                if let Add(m) = acc {
+                    acc = Add(n + m);
+                    None
+                } else if is_useful(&acc) {
+                    let res = acc;
+                    acc = Add(n);
+                    Some(res)
+                } else {
+                    None
+                }
+            }
+            Shift(n) => {
+                if let Shift(m) = acc {
+                    acc = Shift(n + m);
+                    None
+                } else if is_useful(&acc) {
+                    let res = acc;
+                    acc = Shift(n);
+                    Some(res)
+                } else {
+                    None
+                }
+            }
+            Loop(loop_contents) => {
+                if is_useful(&acc) {
+                    optimised_ast.push(acc);
+                    acc = ACC_DEFAULT_VALUE;
+                }
+                Some(Loop(optimise(loop_contents)))
+            }
+            // Wild card for all other symbol types.
+            a => Some(a),
+        } {
+            optimised_ast.push(optimised_symbol);
+        }
+    }
+
+    if is_useful(&acc) {
+        optimised_ast.push(acc);
+    }
+
+    println!("Optimised AST: {optimised_ast:?}");
+    optimised_ast
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
-    fn lexing_and_parsing() {
-        let source = "+-  <>[++Hi there!],.";
+    fn lexing_and_parsing_and_optimisation() {
+        let source = "++-  ><>[++Hi there!],.";
 
         let expected_tokens = vec![
             Token::Inc,
+            Token::Inc,
             Token::Dec,
+            Token::ShiftRight,
             Token::ShiftLeft,
             Token::ShiftRight,
             Token::BracketLeft,
@@ -133,7 +212,9 @@ mod tests {
 
         let expected_symbols = vec![
             Symbol::Add(1),
+            Symbol::Add(1),
             Symbol::Add(-1),
+            Symbol::Shift(1),
             Symbol::Shift(-1),
             Symbol::Shift(1),
             Symbol::Loop(vec![Symbol::Add(1), Symbol::Add(1)]),
@@ -144,9 +225,23 @@ mod tests {
         let symbols = parsed(&tokens).expect("Parses correctly.");
 
         assert_eq!(symbols.len(), expected_symbols.len());
-        for (exp, act) in std::iter::zip(expected_symbols, symbols) {
+        for (exp, act) in std::iter::zip(&expected_symbols, &symbols) {
             assert_eq!(exp, act);
         }
+
+        let expected_optimised_symbols = vec![
+            Symbol::Add(1),
+            Symbol::Shift(1),
+            Symbol::Loop(vec![Symbol::Add(2)]),
+            Symbol::Input,
+            Symbol::Output,
+        ];
+        let optimised_symbols = optimise(symbols);
+
+        for (exp, act) in std::iter::zip(&expected_optimised_symbols, &optimised_symbols) {
+            assert_eq!(exp, act);
+        }
+        assert_eq!(optimised_symbols.len(), expected_optimised_symbols.len());
     }
 
     #[test]
@@ -161,6 +256,19 @@ mod tests {
         let source = "]";
         let symbols = parsed(&lexed(source));
         assert_eq!(symbols, Err(ParseError::ImbalancedBrackets));
+    }
+
+    #[test]
+    fn optimisation() {
+        let source = "+++->>><<";
+        let ast = optimise(parsed(&lexed(source)).expect("Valid source."));
+        use Symbol::*;
+        let expected_ast = vec![Add(2), Shift(1)];
+
+        assert_eq!(ast.len(), expected_ast.len());
+        for (exp, act) in std::iter::zip(&expected_ast, &ast) {
+            assert_eq!(exp, act);
+        }
     }
 }
 
