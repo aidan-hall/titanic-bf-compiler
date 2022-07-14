@@ -12,6 +12,7 @@ enum Token {
 }
 
 /// Lex the source into a token stream, ignoring non-BF characters.
+/// Having a separate lexing stage makes it easy to use BF "skins" such as Ook!
 fn lex(source: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
 
