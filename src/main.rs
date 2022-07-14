@@ -13,7 +13,7 @@ enum Token {
 
 /// Lex the source into a token stream, ignoring non-BF characters.
 /// Having a separate lexing stage makes it easy to use BF "skins" such as Ook!
-fn lex(source: &str) -> Vec<Token> {
+fn lexed(source: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
 
     for c in source.chars() {
@@ -124,7 +124,7 @@ mod tests {
             Token::Output,
         ];
 
-        let tokens = lex(source);
+        let tokens = lexed(source);
 
         assert_eq!(tokens.len(), expected_tokens.len());
         for (exp, act) in std::iter::zip(&expected_tokens, &tokens) {
@@ -152,14 +152,14 @@ mod tests {
     #[test]
     fn imbalanced_opening_bracket() {
         let source = "[";
-        let symbols = parsed(&lex(source));
+        let symbols = parsed(&lexed(source));
         assert_eq!(symbols, Err(ParseError::ImbalancedBrackets));
     }
 
     #[test]
     fn imbalanced_closing_bracket() {
         let source = "]";
-        let symbols = parsed(&lex(source));
+        let symbols = parsed(&lexed(source));
         assert_eq!(symbols, Err(ParseError::ImbalancedBrackets));
     }
 }
