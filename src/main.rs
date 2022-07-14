@@ -58,7 +58,7 @@ enum ParseError {
 type Ast = Vec<Symbol>;
 
 /// Parse the token stream into an AST. Perform no optimisations.
-fn parse(tokens: &Vec<Token>) -> Result<Ast, ParseError> {
+fn parsed(tokens: &Vec<Token>) -> Result<Ast, ParseError> {
     use std::collections::LinkedList;
 
     let mut asts: LinkedList<Ast> = LinkedList::new();
@@ -141,7 +141,7 @@ mod tests {
             Symbol::Output,
         ];
 
-        let symbols = parse(&tokens).expect("Parses correctly.");
+        let symbols = parsed(&tokens).expect("Parses correctly.");
 
         assert_eq!(symbols.len(), expected_symbols.len());
         for (exp, act) in std::iter::zip(expected_symbols, symbols) {
@@ -152,14 +152,14 @@ mod tests {
     #[test]
     fn imbalanced_opening_bracket() {
         let source = "[";
-        let symbols = parse(&lex(source));
+        let symbols = parsed(&lex(source));
         assert_eq!(symbols, Err(ParseError::ImbalancedBrackets));
     }
 
     #[test]
     fn imbalanced_closing_bracket() {
         let source = "]";
-        let symbols = parse(&lex(source));
+        let symbols = parsed(&lex(source));
         assert_eq!(symbols, Err(ParseError::ImbalancedBrackets));
     }
 }
