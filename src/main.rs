@@ -57,26 +57,26 @@ mod tests {
     use super::*;
     #[test]
     fn lexer_symbols() {
-	let source = "+-  <>[Hi there!],.";
+        let source = "+-  <>[Hi there!],.";
 
-	use Token::*;
-	let expected = vec![
-	    Inc,
-	    Dec,
-	    ShiftLeft,
-	    ShiftRight,
-	    BracketLeft,
-	    BracketRight,
-	    Input,
-	    Output,
-	];
+        use Token::*;
+        let expected = vec![
+            Inc,
+            Dec,
+            ShiftLeft,
+            ShiftRight,
+            BracketLeft,
+            BracketRight,
+            Input,
+            Output,
+        ];
 
-	let tokens = lex(source);
+        let tokens = lex(source);
 
-	assert_eq!(tokens.len(), expected.len());
-	for (exp, act) in std::iter::zip(expected, tokens) {
-	    assert_eq!(exp, act);
-	}
+        assert_eq!(tokens.len(), expected.len());
+        for (exp, act) in std::iter::zip(expected, tokens) {
+            assert_eq!(exp, act);
+        }
     }
 }
 
