@@ -61,10 +61,10 @@ type Ast = Vec<Symbol>;
 /// Since this is the only function that generates an Ast from something else,
 /// we can assume all Asts are valid (hence the value of the type alias).
 fn parsed(tokens: &Vec<Token>) -> Result<Ast, ParseError> {
-    use std::collections::LinkedList;
 
-    let mut asts: LinkedList<Ast> = LinkedList::new();
-    asts.push_front(Vec::new());
+    let mut asts: Vec<Ast> = Vec::new();
+    asts.push(Vec::new());
+    // asts.push_front(Vec::new());
 
     for token in tokens {
         use Symbol::*;
@@ -76,17 +76,17 @@ fn parsed(tokens: &Vec<Token>) -> Result<Ast, ParseError> {
             ShiftRight => Some(Shift(1)),
             BracketLeft => {
                 // Begin parsing tokens for the contents of the loop.
-                asts.push_front(Vec::new());
+                asts.push(Vec::new());
                 None
             }
             BracketRight => Some(Loop(
-                asts.pop_front()
+                asts.pop()
                     .expect("Height ≥ 1 should be guaranteed here."),
             )),
             Token::Input => Some(Symbol::Input),
             Token::Output => Some(Symbol::Output),
         } {
-            if let Some(ast) = asts.front_mut() {
+            if let Some(ast) = asts.last_mut() {
                 ast.push(symbol);
             } else {
                 return Err(ParseError::ImbalancedBrackets);
@@ -98,7 +98,7 @@ fn parsed(tokens: &Vec<Token>) -> Result<Ast, ParseError> {
         1 => {
             // Take ownership: Ha ha, I understand Rust!
             let ast = asts
-                .pop_front()
+                .pop()
                 .expect("len = 1, so there should be a front element.");
             Ok(ast)
         }
