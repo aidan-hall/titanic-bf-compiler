@@ -114,8 +114,6 @@ fn is_useful(symbol: &Symbol) -> bool {
 /// "Flatten" multiple sequential Add & Shift instructions, recursively.
 /// This function's name is a verb since it takes ownership of/consumes the input.
 fn optimise(ast: Ast) -> Ast {
-    println!("Optimising AST: {ast:?}");
-
     // Just saves reallocating a new vector.
     if ast.is_empty() {
         return ast;
@@ -143,7 +141,7 @@ fn optimise(ast: Ast) -> Ast {
                     acc = Add(n);
                     Some(res)
                 } else {
-		    acc = Add(n);
+                    acc = Add(n);
                     None
                 }
             }
@@ -156,27 +154,26 @@ fn optimise(ast: Ast) -> Ast {
                     acc = Shift(n);
                     Some(res)
                 } else {
-		    acc = Shift(n);
+                    acc = Shift(n);
                     None
                 }
             }
             Loop(loop_contents) => {
                 if is_useful(&acc) {
                     optimised_ast.push(acc);
-                    acc = ACC_DEFAULT_VALUE;
                 }
                 let res = Loop(optimise(loop_contents));
-		acc = ACC_DEFAULT_VALUE;
-		Some(res)
-            },
+                acc = ACC_DEFAULT_VALUE;
+                Some(res)
+            }
             // Wild card for all other symbol types.
             a => {
                 if is_useful(&acc) {
                     optimised_ast.push(acc);
                     acc = ACC_DEFAULT_VALUE;
                 }
-		Some(a)
-	    },
+                Some(a)
+            }
         } {
             optimised_ast.push(optimised_symbol);
         }
@@ -186,7 +183,6 @@ fn optimise(ast: Ast) -> Ast {
         optimised_ast.push(acc);
     }
 
-    println!("Optimised AST: {optimised_ast:?}");
     optimised_ast
 }
 
@@ -298,6 +294,7 @@ mod tests {
 
 /// Compile the AST to NASM x86 assembly.
 fn compiled_x86(ast: &Ast) -> String {
+    println!("Compiling: {ast:?}");
     let mut asm = String::from(
         "SYS_EXIT:	equ	1
 SYS_READ:	equ	3
@@ -307,14 +304,16 @@ STDOUT: 	equ	1
 
 	; Parameters: left bracket identifier, right bracket identifier
 %macro left_bracket 2
-%1:
-	cmp ecx, 0
+	test cx, cx
 	jz %2
+%1:
 %endmacro
 
 	; Parameters: left bracket identifier, right bracket identifier
 %macro right_bracket 2
-	jmp %1
+	and ecx, 0xFF00
+	cmp ecx, 0
+	jne %1
 %2:
 %endmacro
 
@@ -379,7 +378,7 @@ memory_shift:			; Uses ebx as value to shift by.
 	mov ecx, [cells+eax]
 	ret
 
-section .bss
+section .data
 cells:	times 30000 db 0
 ",
     );
@@ -397,8 +396,21 @@ fn mapped_x86(ast: &Ast, loop_counter: usize) -> (String, usize) {
     for symbol in ast {
         use Symbol::*;
         let instruction = match symbol {
-            Add(n) => format!("\tadd ecx, {n}\n"),
-            Shift(n) => format!("\tmacro_shift {n}\n"),
+            Add(n) => {
+                if n > &0 {
+                    format!("\tadd ecx, {}\n", n)
+                } else {
+                    format!("\tsub ecx, {}\n", -n)
+                }
+            }
+            Shift(n) => format!(
+                "\tmov [cells+eax], ecx
+\t{} eax, {}
+\tmov ecx, [cells+eax]
+",
+                if n > &0 { "add" } else { "sub" },
+                if n > &0 { *n } else { -n }
+            ),
             Input => "\tcall read_value\n".to_string(),
             Output => "\tcall write_value\n".to_string(),
             Loop(loop_contents) => {
@@ -427,27 +439,16 @@ fn main() {
 
     for arg in &args.as_slice()[1..] {
         let name = format!("{arg}-compiled.asm");
-	let src = fs::read_to_string(arg)
-	    .expect("Couldn't read {arg}.");
+        let src = fs::read_to_string(arg).expect("Couldn't read {arg}.");
 
-	match parsed(&lexed(src.as_str())) {
-	    Err(e) => eprintln!("Couldn't compile {arg}: {e:?}"),
-	    Ok(ast) => {
-		let asm = compiled_x86(&optimise(ast));
-		fs::write(&name, asm).expect("Couldn't write to {name}.");
-		eprintln!("Assembly written to {name}");
-	    }
-	}
+        match parsed(&lexed(src.as_str())) {
+            Err(e) => eprintln!("Couldn't compile {arg}: {e:?}"),
+            Ok(ast) => {
+                let asm = compiled_x86(&optimise(ast));
+                fs::write(&name, asm).expect("Couldn't write to {name}.");
+                eprintln!("Assembly written to {name}");
+            }
+        }
     }
 
-//     let src = compiled_x86(
-//         &parsed(&lexed(
-//             "
-// +++++++++++++++++++++++++++++++++++++++++++++++++++++>+++[-<+>]<.
-// Output new line character to flush stdout
-// >>++++++++++.",
-//         ))
-//         .expect("Valid"),
-//     );
-//     println!("{src}");
 }
